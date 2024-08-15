@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import {
     deleteVideo,
+    getAllUserVideos,
     getAllVideos,
+    getRandomVideos,
     getVideoById,
+    incrementVideoView,
     publishAVideo,
     togglePublishStatus,
     updateVideo,
@@ -11,6 +14,7 @@ import {verifyJWT} from "../middlewares/auth.middleware.js"
 import {upload} from "../middlewares/multer.middleware.js"
 
 const router = Router();
+// const freeRouter=Router();
 router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
 
 router
@@ -30,6 +34,7 @@ router
         ]),
         publishAVideo
     );
+    router.route("/get-User-Videos").get(getAllUserVideos)
 
 router
     .route("/:videoId")
@@ -38,5 +43,7 @@ router
     .patch(upload.single("thumbnail"), updateVideo);
 
 router.route("/toggle/publish/:videoId").patch(togglePublishStatus);
+router.route("/incrementViews/:videoId").get(incrementVideoView)
+
 
 export default router

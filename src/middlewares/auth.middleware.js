@@ -1,6 +1,7 @@
 import { User } from "../models/user.model.js";
 import jwt from "jsonwebtoken"
 import { apiError } from "../utils/apiError.js";
+import { apiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const verifyJWT= asyncHandler(async(req,_,next)=>{
@@ -19,5 +20,15 @@ export const verifyJWT= asyncHandler(async(req,_,next)=>{
         next()
     } catch (error) {
         throw new apiError(401,error?.message ||"Inavlid access Token")
+    }
+})
+
+export const checkToken=asyncHandler(async(req,res)=>{
+    const token=req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ","")
+    if(!token){
+        return res.status(200).json(new apiResponse(200,false,''))
+    }
+    else{
+        return res.status(200).json(new apiResponse(200,true,''))
     }
 })

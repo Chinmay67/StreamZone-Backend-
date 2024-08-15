@@ -6,22 +6,66 @@ import {apiResponse} from "../utils/apiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 
-
+const getRandomVideos=asyncHandler(async(req,res)=>{
+   try {
+    const videos=await Video.find()
+    .populate('owner','username')
+    .sort({createdAt:-1})
+    if(!videos){
+        return res.status(200).json(new apiResponse(200,{},"No videos found"))
+    }
+    else{
+        return res.status(200).json(new apiResponse(200,videos,"videos fetched successfully"))
+    }
+   } catch (error) {
+    console.log(error)
+    throw new apiError(200,"errors faced in fetching videos")
+   }
+})
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
+    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
     //TODO: get all videos based on query, sort, pagination
-    const videos=Video.find({owner:req.user?._id})
-    const totalVideos=await videos.countDocuments();
-    // const totalPages=Math.ceil(totalVideos/limit);
-    // const hasNextPage=page<totalPages
-    // const videosData=await videos
-    // .sort({createdAt:sortType})
-    // .limit(limit * 1)
-    // .skip((page - 1) * limit)
-    // .exec(); 
-    // .sort({createdAt:sortType})
-    
-    res.status(200).json(new apiResponse(200,videos,"all videos fetched"))
+    const filter = {};
+    if (query) {
+      // You can customize this part based on your search requirements
+      filter.$or = [
+        { title: { $regex: query, $options: "i" } }, // Case-insensitive title search
+        { description: { $regex: query, $options: "i" } }, // Case-insensitive description search
+      ];
+    }
+    if (userId) {
+      filter.owner = userId;
+    }
+  
+    // Construct the sort object based on sortBy and sortType parameters
+    const sort = {};
+    if (sortBy) {
+      sort[sortBy] = sortType === "desc" ? -1 : 1;
+    }
+  
+    // Fetch videos from the database based on filter, sort, and pagination
+    const videos = await Video.find(filter)
+      .sort(sort)
+      .populate("owner") // Populate the 'owner' field to fetch full details of the owner
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+  
+    // Get total count of videos matching the filter (for pagination)
+    const totalCount = await Video.countDocuments(filter);
+  
+    // Construct response object with videos and pagination info
+    const response = {
+      totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: parseInt(page),
+      limit: parseInt(limit),
+      videos,
+    };
+  
+    // Send back the response
+    return res
+      .status(200)
+      .json(new apiResponse(200, response, "Videos fetched successfully"))
 
 
 })
@@ -70,17 +114,25 @@ const publishAVideo = asyncHandler(async (req, res) => {
 })
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
+   
+    // console.log("id=",videoId);
     //TODO: get video by id
     
-    const video=await Video.findById(videoId);
-    if(!video){
-        throw new apiError(400,"video not found");
+    try {
+        const video=await Video.findById(videoId)
+        .populate('owner','username avatar');
+        if(!video){
+            throw new apiError(400,"video not found");
+        }
+        res.status(200)
+        .json(
+            new apiResponse(200,video,"video found")
+        )
+    
+    } catch (error) {
+        console.log(error)
+        
     }
-    res.status(200)
-    .json(
-        new apiResponse(200,video,"video found")
-    )
-
 
 })
 
@@ -161,6 +213,72 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     )
 
 })
+const getAllUserVideos = asyncHandler(async (req, res) => {
+    console.log(req.user)
+    const userId = req.user?._id;
+    // const userId=mongoose.Types.ObjectId(id)
+    if (!userId) {
+      return res.status(401).json(new apiResponse(401, null, "Unauthorized access"));
+    }
+    // if (!mongoose.Types.ObjectId.isValid(id)) {
+    //     return res.status(400).json(new apiResponse(400, null, "Invalid user ID"));
+    //   }
+    
+    try {
+      const videos = await Video.find({ owner: userId , isPublished:true })
+        .populate('owner', 'username')
+        .sort({ createdAt: -1 });
+  
+      if (!videos || videos.length === 0) {
+        return res.status(200).json(new apiResponse(200, [], "No Videos"));
+      }
+  
+      return res.status(200).json(new apiResponse(200, videos, "Videos Retrieved Successfully"));
+    } catch (error) {
+      return res.status(500).json(new apiResponse(500, null, "Unable to fetch videos"));
+    }
+  });
+
+  const getOtherUserVideos=asyncHandler(async(req,res)=>{
+    const {username}=req.params
+    if(!username){
+        throw new apiError(404,'channel Not Found')
+    }
+    try {
+        const user=await User.findOne({username})
+        if(!user){
+            throw new apiError(404,'channel Not Found')
+        }
+        const videos=await Video.find({owner:user._id, isPublished:true })
+        .populate('owner','username')
+        .sort({createdAt:-1})
+        if(!videos||videos.length===0){
+            return res.status(200).json(new apiResponse(200,[],"No Videos"))
+        }
+        return res.status(200).json(new apiResponse(200,videos,"Videos Retrieved Successfully"))
+    } catch (error) {
+        throw new apiError(500,"unable to fetch Videos")
+    }
+  })
+  const incrementVideoView=asyncHandler(async(req,res)=>{
+    const {videoId}=req.params;
+    if(!videoId){
+        throw new apiError(404,"not a valid video")
+    }
+    try {
+        const video=await Video.findByIdAndUpdate(
+            videoId,
+            {$inc:{views:1}},
+            {new:true}
+        )
+       if(!video){
+        throw new apiError(404,"video does not exist")
+       }
+       return res.status(200).json(new apiResponse(200, video,"view updated successfully"))
+    } catch (error) {
+        throw new apiError(500, "error updating views")
+    }
+  })
 
 export {
     getAllVideos,
@@ -169,5 +287,9 @@ export {
     updateVideo,
     deleteVideo,
     togglePublishStatus,
-    updateVideoThumbnail
+    updateVideoThumbnail,
+    getRandomVideos,
+    getAllUserVideos,
+    getOtherUserVideos,
+    incrementVideoView
 }

@@ -17,6 +17,11 @@ const likeSchema=new Schema({
         type:mongoose.Schema.Types.ObjectId,
         ref:"User",
         
+    },
+    likeType:{
+        type:String,
+        enum:["like", "dislike"],
+        required: true,
     }
 },{timestamps:true})
 

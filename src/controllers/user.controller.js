@@ -22,7 +22,9 @@ const generateAccessAndRefreshToken=async(userId)=>{
         
     }
 }
+
 const registerUser = asyncHandler(async(req,res)=>{
+    // console.log("from backend",req.body);
    const {fullname,email,username,password}=req.body
     // console.log("email:",email)
 //    if(fullname===""){
@@ -66,23 +68,24 @@ const registerUser = asyncHandler(async(req,res)=>{
         username:username.toLowerCase()  
 
     })
+
     const createdUser=await User.findById(user._id).select(
         "-password -refreshToken")
     if(!createdUser){
         throw new apiError(500,"something went wrong while registering the user")
     }
-
+    
     return res.status(201).json(
         new apiResponse(200,createdUser,"User registered successfully")
     )
-
+    
 })
 
 const loginUser=asyncHandler(async (req,res)=>{
     const {email,username,password}=req.body
     
     if(!(username || email)){
-        throw new apiError(400,"username or password are required")
+        throw new apiError(400,"username or email are required")
     }
     const user=await User.findOne({
         $or:[{username},{email}]
@@ -109,7 +112,7 @@ const loginUser=asyncHandler(async (req,res)=>{
     .cookie("accessToken",accessToken, options)
     .cookie("refreshToken",refreshToken,options)
     .json(
-        new apiResponse(
+        new apiResponse(    
             200,
             {
                 user:loggedInUser,accessToken,refreshToken
@@ -118,6 +121,20 @@ const loginUser=asyncHandler(async (req,res)=>{
         )
     )
 })  
+
+// const findUserById=asyncHandler(async(req,res)=>{
+//     const Id=req.body.owner
+//     if(!Id){
+//         throw new apiError(400,"id is required")
+//     }
+    
+//     try {
+//         const channelName=await User.findById(Id).select("username")
+//         return res.status(200).json(new apiResponse(200,{channelName},"channelName fetched successfully"))
+//     } catch (error) {
+//         console.log("error fetching channel", error)
+//     }
+// })
 const logoutUser=asyncHandler(async(req,res)=>{
     await User.findByIdAndUpdate(
         req.user._id,
@@ -160,7 +177,7 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
         }
     
         if(incomingRefeshToken!==user?.refreshToken){
-            throw new apiError(401,"refresh toke is expired or lost")
+            throw new apiError(401,"refresh token is expired or lost")
         }
     
         const options={
@@ -233,7 +250,7 @@ const updateAccountDetails=asyncHandler(async(req,res)=>{
         {new:true}
     ).select("-password")
 
-    return res.status(200).json(new apiResponse(200,user,'Account details uploaded successfult'))
+    return res.status(200).json(new apiResponse(200,user,'Account details uploaded successfully'))
 
 
 })
@@ -243,7 +260,7 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
     const avatarLocalPath=req.file?.path
 
     if(!avatarLocalPath){
-        throw new apiError(400,"Alvatar file is missing")
+        throw new apiError(400,"Avatar file is missing")
 
         
     }
@@ -368,7 +385,68 @@ const getUserChannelProfile=asyncHandler(async(req,res)=>{
     )
 })
 
+const getOtherChannelProfile=asyncHandler(async(req,res)=>{
+    const {username}=req.params
+    if(!username?.trim()){
+        throw new apiError(400,"username is missing")
+    }
+    const channel=await User.aggregate([
+        {
+            $match:{
+                username:username?.toLowerCase()
 
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+       
+        {
+            $addFields:{
+                subscribersCount:{
+                    $size:"$subscribers"
+                },
+               
+                isSubscribed:{
+                    $cond:{
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                fullname:1,
+                username:1,
+                subscribersCount:1,
+                // channelsSubscibedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                // email:1
+            }
+        }
+    ])
+    if(!channel?.length){
+        throw new apiError(404,"Channel does not exists")
+
+    }
+
+    return res
+    .status(200)
+    .json(
+        new apiResponse(200, channel[0],"user Channel fteched succesfully")
+    )
+
+
+})
 const getWatchHistory=asyncHandler(async(req,res)=>{
     const user=await User.aggregate([
         {
@@ -436,5 +514,7 @@ export{
     getCurrentUser,
     changeCurrentPassword,
     getUserChannelProfile,
-    getWatchHistory
+    getWatchHistory,
+    getOtherChannelProfile
+    
 }
