@@ -22,6 +22,22 @@ const getRandomVideos=asyncHandler(async(req,res)=>{
     throw new apiError(200,"errors faced in fetching videos")
    }
 })
+const getTrendingVideos=asyncHandler(async(req,res)=>{
+    try {
+     const videos=await Video.find()
+     .populate('owner','username')
+     .sort({views:-1})
+     if(!videos){
+         return res.status(200).json(new apiResponse(200,{},"No videos found"))
+     }
+     else{
+         return res.status(200).json(new apiResponse(200,videos,"videos fetched successfully"))
+     }
+    } catch (error) {
+     console.log(error)
+     throw new apiError(200,"errors faced in fetching videos")
+    }
+ })
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
     //TODO: get all videos based on query, sort, pagination
@@ -291,5 +307,6 @@ export {
     getRandomVideos,
     getAllUserVideos,
     getOtherUserVideos,
-    incrementVideoView
+    incrementVideoView,
+    getTrendingVideos
 }
