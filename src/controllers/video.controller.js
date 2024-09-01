@@ -1,15 +1,16 @@
 import mongoose, {isValidObjectId} from "mongoose"
 import {Video} from "../models/video.model.js"
 import {User} from "../models/user.model.js"
+import { Like } from "../models/like.model.js"
 import {apiError} from "../utils/apiError.js"
 import {apiResponse} from "../utils/apiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import {uploadOnCloudinary, uploadVideoOnCloudinary} from "../utils/cloudinary.js"
 
 const getRandomVideos=asyncHandler(async(req,res)=>{
    try {
     const videos=await Video.find()
-    .populate('owner','username')
+    .populate('owner','username avatar')
     .sort({createdAt:-1})
     if(!videos){
         return res.status(200).json(new apiResponse(200,{},"No videos found"))
@@ -25,7 +26,7 @@ const getRandomVideos=asyncHandler(async(req,res)=>{
 const getTrendingVideos=asyncHandler(async(req,res)=>{
     try {
      const videos=await Video.find()
-     .populate('owner','username')
+     .populate('owner','username avatar')
      .sort({views:-1})
      if(!videos){
          return res.status(200).json(new apiResponse(200,{},"No videos found"))
@@ -99,7 +100,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const thumbnailFile=await uploadOnCloudinary(thumbnailPath);
     const videoLocalPath=req.files?.videoFile[0]?.path;
 
-    const videoFile=await uploadOnCloudinary(videoLocalPath);
+    const videoFile=await uploadVideoOnCloudinary(videoLocalPath);
     if(!thumbnailFile){
         throw new apiError(400,"please upload a thumbnail file")
     }
@@ -111,7 +112,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
         title,
         description,
         videoFile:videoFile.secure_url,
-        thumbnail:thumbnailFile.secure_url,
+        thumbnail:thumbnailFile,
         duration:videoFile.duration,
         owner:req.user
 
@@ -137,12 +138,14 @@ const getVideoById = asyncHandler(async (req, res) => {
     try {
         const video=await Video.findById(videoId)
         .populate('owner','username avatar');
+        const videoLike=await Like.find({video:videoId, likeType:"like"}).countDocuments()
+        const videoDisLike=await Like.find({video:videoId, likeType:"dislike"}).countDocuments()
         if(!video){
             throw new apiError(400,"video not found");
         }
         res.status(200)
         .json(
-            new apiResponse(200,video,"video found")
+            new apiResponse(200,{video,likes:videoLike,dislikes:videoDisLike},"video found")
         )
     
     } catch (error) {
@@ -154,17 +157,21 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
-    const {title ,description}=req.body;
-    if(!title || !description){
+    const {title ,description,isPublished}=req.body;
+    if(!title || !description || !isPublished){
         throw new apiError(400,"all fields are required")
 
     }
     const video=await Video.findByIdAndUpdate(
         videoId,
-        {
-            title,
-            description
+         {
+            $set:{
+                title,
+                description,
+                isPublished
+            }
         },
+        {new:true}
     )
     if(!video){
         throw new apiError(404,"video does not exist")
@@ -179,34 +186,46 @@ const updateVideoThumbnail=asyncHandler(async(req,res)=>{
     //TODO: update video thumbnail
     const {videoId}=req.params;
     const thumbnailPath=req.file?.path;
+    console.log(videoId)
     if(!thumbnailPath){
         throw new apiError(404,"thumbnail missing")
     }
-    const updatedThumbnail=await uploadOnCloudinary(thumbnailPath);
-    const video=Video.findByIdAndUpdate(
-        videoId,
-        {
-            thumbnail:updatedThumbnail.secure_url
-        },
-        {new:true}
-    )
-    if(!video){
-        throw new apiError(404,"video does not exist");
+    try {
+        const updatedThumbnail=await uploadOnCloudinary(thumbnailPath);
+        const video=await Video.findByIdAndUpdate(
+            videoId,
+            {
+                $set:{
+                    thumbnail:updatedThumbnail
+                }
+            },
+            {new:true}
+        ).lean()
+        if(!video){
+            throw new apiError(404,"video does not exist");
+        }
+        res.status(201)
+        .json(new apiResponse(201,video,"thumbnail updated successfully"));
+        
+    } catch (error) {
+        console.log(error)
+        throw new apiError(500,"unable to update")
     }
-    res.status(201)
-    .json(new apiResponse(201,video,"thumbnail updated successfully"));
-    
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
-    const video=await Video.findByIdAndDelete(videoId);
-    if(!video){
-        throw new apiError(404,"video does not exist")
+    try {
+        const video=await Video.findByIdAndDelete(videoId);
+        if(!video){
+            throw new apiError(404,"video does not exist")
+        }
+        //TODO: delete video
+        res.status(200)
+        .json(new apiResponse(200,{},"video deleted successfully"));
+    } catch (error) {
+        throw new apiError(500,"unable to delete video")   
     }
-    //TODO: delete video
-    res.status(200)
-    .json(new apiResponse(200,{},"video deleted successfully"));
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
@@ -266,7 +285,7 @@ const getAllUserVideos = asyncHandler(async (req, res) => {
             throw new apiError(404,'channel Not Found')
         }
         const videos=await Video.find({owner:user._id, isPublished:true })
-        .populate('owner','username')
+        .populate('owner','username avatar')
         .sort({createdAt:-1})
         if(!videos||videos.length===0){
             return res.status(200).json(new apiResponse(200,[],"No Videos"))

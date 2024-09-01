@@ -43,7 +43,7 @@ const registerUser = asyncHandler(async(req,res)=>{
         throw new apiError(409,"User with similar email or username already exists")
 
     }
-    console.log(req.files);
+    // console.log(req.files);
     const avatarLocalPath=req.files?.avatar[0]?.path
     // const coverImageLocalPath=req.files?.coverImage[0]?.path
 
@@ -61,8 +61,8 @@ const registerUser = asyncHandler(async(req,res)=>{
     }
     const user=await User.create({
         fullname,
-        avatar : avatar.url,
-        coverImage: coverImage?.url||"",
+        avatar : avatar,
+        coverImage: coverImage||"",
         email,
         password,
         username:username.toLowerCase()  
@@ -239,19 +239,25 @@ const updateAccountDetails=asyncHandler(async(req,res)=>{
         throw new apiError(400,"All fields are required")
     }
 
-    const user=await User.findByIdAndUpdate(
-        req.user?._id,
-        {
-            $set:{
-                fullname:fullname,
-                email:email
-            }
-        },
-        {new:true}
-    ).select("-password")
-
-    return res.status(200).json(new apiResponse(200,user,'Account details uploaded successfully'))
-
+   try {
+     const user=await User.findByIdAndUpdate(
+         req.user?._id,
+         {
+             $set:{
+                 fullname:fullname,
+                 email:email
+             }
+         },
+         {new:true}
+     ).select("-password")
+ 
+     return res.status(200).json(new apiResponse(200,user,'Account details uploaded successfully'))
+ 
+   } catch (error) {
+    console.log(error);
+    
+    throw new apiError(404,"error updating details")
+   }
 
 })
 
@@ -266,7 +272,7 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
     }
     const avatar=await uploadOnCloudinary(avatarLocalPath)
 
-    if(!avatar.url){
+    if(!avatar){
         throw new apiError(400,"Error while uploading on avatar")
     }
 
@@ -274,7 +280,7 @@ const updateUserAvatar=asyncHandler(async(req,res)=>{
         req.user?._id,
         {
             $set:{
-                avatar:avatar.url
+                avatar:avatar
             }
         },
         {new:true}
@@ -293,7 +299,7 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
     }
     const coverImage=await uploadOnCloudinary(coverImageLocalPath)
 
-    if(!coverImage.url){
+    if(!coverImage){
         throw new apiError(400,"Error while uploading on avatar")
     }
 
@@ -301,7 +307,7 @@ const updateUserCoverImage=asyncHandler(async(req,res)=>{
         req.user?._id,
         {
             $set:{
-                coverImage:coverImage.url
+                coverImage:coverImage
             }
         },
         {new:true}

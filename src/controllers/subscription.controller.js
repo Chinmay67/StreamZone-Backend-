@@ -72,9 +72,19 @@ const checkUserSubscription=asyncHandler(async(req,res)=>{
    }
 })
 
+const getOtherSubcriberCount=asyncHandler(async(req,res)=>{
+    const {id}=req.params
+    try {
+        const subscriberCount=await Subscription.find({channel:id})
+        res.status(200).json(new apiResponse(200,subscriberCount,"subscriber count fetched"))
+    } catch (error) {
+        throw new apiError(404 ,"error fetching subscriber")
+    }
+})
 export {
     toggleSubscription,
     getUserChannelSubscribers,
     getSubscribedChannels,
-    checkUserSubscription
+    checkUserSubscription,
+    getOtherSubcriberCount
 }
