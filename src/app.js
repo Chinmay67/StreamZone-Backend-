@@ -22,6 +22,7 @@ import likeRouter from "./routes/like.routes.js"
 import playlistRouter from "./routes/playlist.routes.js"
 import dashboardRouter from "./routes/dashboard.routes.js"
 import freeRouter from "./routes/free.routes.js"
+import statRouter from "./routes/stats.routes.js"
 
 
 
@@ -35,6 +36,7 @@ app.use("/api/v1/likes", likeRouter)
 app.use("/api/v1/playlist", playlistRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/free",freeRouter)
+app.use("/api/v1/stats",statRouter)
 
 
 export {app}

@@ -46,9 +46,13 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 
 // controller to return channel list to which user has subscribed
 const getSubscribedChannels = asyncHandler(async (req, res) => {
-    const { subscriberId } = req.params
-    const subscribedChannels = await Subscription.find({ subscriber: subscriberId })
-    res.status(200).json(new apiResponse(200,subscribedChannels,"subscribed channels fetched"))
+    const subscriberId  = req.user._id
+    try {
+        const subscribedChannels = await Subscription.find({ subscriber: subscriberId })
+        res.status(200).json(new apiResponse(200,subscribedChannels,"subscribed channels fetched"))
+    } catch (error) {
+        throw new apiError(500,"unable to fetch channels")
+    }
 })
 
 const checkUserSubscription=asyncHandler(async(req,res)=>{
@@ -75,7 +79,7 @@ const checkUserSubscription=asyncHandler(async(req,res)=>{
 const getOtherSubcriberCount=asyncHandler(async(req,res)=>{
     const {id}=req.params
     try {
-        const subscriberCount=await Subscription.find({channel:id})
+        const subscriberCount=await Subscription.find({channel:id}).countDocuments()
         res.status(200).json(new apiResponse(200,subscriberCount,"subscriber count fetched"))
     } catch (error) {
         throw new apiError(404 ,"error fetching subscriber")
