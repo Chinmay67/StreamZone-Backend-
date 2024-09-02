@@ -49,6 +49,7 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
     const subscriberId  = req.user._id
     try {
         const subscribedChannels = await Subscription.find({ subscriber: subscriberId })
+        .populate("channel" ,"username fullname avatar")
         res.status(200).json(new apiResponse(200,subscribedChannels,"subscribed channels fetched"))
     } catch (error) {
         throw new apiError(500,"unable to fetch channels")
