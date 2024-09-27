@@ -99,8 +99,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const thumbnailPath=req.files?.thumbnail[0]?.path;
     const thumbnailFile=await uploadOnCloudinary(thumbnailPath);
     const videoLocalPath=req.files?.videoFile[0]?.path;
-
+    
     const videoFile=await uploadVideoOnCloudinary(videoLocalPath);
+    // const videoFile2=await uploadVideoToBackblaze(videoLocalPath)
+    // console.log(videoFile2)
     if(!thumbnailFile){
         throw new apiError(400,"please upload a thumbnail file")
     }
@@ -114,7 +116,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
         videoFile:videoFile.secure_url,
         thumbnail:thumbnailFile,
         duration:videoFile.duration,
-        owner:req.user
+        owner:req.user._id
 
         // videoPublicId:videoFile.public_id,
         // videoThumbnail:videoFile.thumbnail,
