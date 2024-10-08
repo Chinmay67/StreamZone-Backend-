@@ -6,6 +6,7 @@ import {apiError} from "../utils/apiError.js"
 import {apiResponse} from "../utils/apiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadOnCloudinary, uploadVideoOnCloudinary} from "../utils/cloudinary.js"
+import uploadVideoToFirebase from "../utils/firebase.js"
 
 const getRandomVideos=asyncHandler(async(req,res)=>{
    try {
@@ -99,21 +100,26 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const thumbnailPath=req.files?.thumbnail[0]?.path;
     const thumbnailFile=await uploadOnCloudinary(thumbnailPath);
     const videoLocalPath=req.files?.videoFile[0]?.path;
+    const mimetype=req.files?.videoFile[0]?.mimetype
+    const originalName=req.files?.videoFile[0].originalname
     
-    const videoFile=await uploadVideoOnCloudinary(videoLocalPath);
+    // const videoFile=await uploadVideoOnCloudinary(videoLocalPath);
+    const videoFile=await uploadVideoToFirebase(videoLocalPath,mimetype, originalName);
     // const videoFile2=await uploadVideoToBackblaze(videoLocalPath)
     // console.log(videoFile2)
     if(!thumbnailFile){
         throw new apiError(400,"please upload a thumbnail file")
     }
+    // console.log(videoFile)
     if(!videoFile){
+        
         throw new apiError(400,"please upload a video file");
 
     }
     const video= await Video.create({
         title,
         description,
-        videoFile:videoFile.secure_url,
+        videoFile:videoFile.publicUrl,
         thumbnail:thumbnailFile,
         duration:videoFile.duration,
         owner:req.user._id
@@ -128,7 +134,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     }
     res.status(200)
     .send(
-        new apiResponse(201,uploadedVideo,"video uploaded successfully")
+        new apiResponse(201,videoFile,"video uploaded successfully")
     )
 })
 const getVideoById = asyncHandler(async (req, res) => {
